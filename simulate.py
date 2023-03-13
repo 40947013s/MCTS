@@ -3,8 +3,11 @@ import numpy as np
 import random
 
 class RP(object):
-    def __init__(self, player):
-        self.board = self.input_board()
+    def __init__(self, player, board=[]):
+        if len(board) == 0:
+            self.board = self.input_board()
+        else:
+            self.board = board
         self.color_base = self.fix_color_base()
         self.player = player
         
@@ -15,10 +18,12 @@ class RP(object):
         print()
         return board
         
-    def fix_color_base(self):
+    def fix_color_base(self, board=[]):
+        if len(board) == 0:
+            board = self.board
         color_base = []
         # 降維
-        dr = list(chain.from_iterable(self.board))
+        dr = list(chain.from_iterable(board))
         for i in range(1, 8):
             color_base.append([i] * (7 - dr.count(i)))
         color_base = list(chain.from_iterable(color_base))
