@@ -37,8 +37,9 @@ class RP(object):
         color_base = list(color_base)
         return color_base
 
-class MCTS_Node(object):
-    def __init__(self, board, main_player, color_base, color=0, simu_player=None, parent=None, parent_action=None):
+
+class MCTS_Middle(object):
+    def __init__(self, board, main_player, color_base, color=0, mode=0, score=0, simu_player=None, parent=None, parent_action=None):
         self.board = board
         self.main_player = main_player
         if simu_player == 'CHAOS':
@@ -47,7 +48,8 @@ class MCTS_Node(object):
             self.color = 0
         else:
             self.color = color
-        self.color_base = color_base  
+        self.color_base = color_base 
+        self.mode = mode 
         
         self.simu_player = simu_player        
         self.parent = parent
@@ -61,6 +63,11 @@ class MCTS_Node(object):
         self.game_results[1] = 0
         self.unpassed_actions = None
         self.unpassed_actions = self.get_legal_actions()
+        
+        if score == 0:
+            self.original_score = self.get_score()
+        else:
+            self.original_score = score
         
     # 取得合法動作 
     def get_legal_actions(self):
@@ -100,6 +107,7 @@ class MCTS_Node(object):
                     if self.board[row][j] != 0:
                         break
                     actions.append((action[0], action[1], row, j))
+        actions.append((sources[0][0], sources[0][1], sources[0][0], sources[0][1]))
         return actions
     
     # 勝場數-敗場數
@@ -132,14 +140,13 @@ class MCTS_Node(object):
         else:
             simu_player = 'ORDER'
             
-        child_node = MCTS_Node(board=moved_board, color_base=deepcopy(current_node.color_base), main_player=current_node.main_player, simu_player=simu_player, parent=current_node, parent_action=action)    
+        child_node = MCTS_Middle(board=moved_board, color_base=deepcopy(current_node.color_base), mode=self.mode, score=self.original_score, main_player=self.main_player, simu_player=simu_player, parent=current_node, parent_action=action)    
         current_node.children.append(child_node)
         return child_node
     
     # 遊戲是否結束
     def is_game_over(self):
-        # 待改
-        return True if np.count_nonzero(self.board) > 42 else False        
+        return True if np.count_nonzero(self.board) > self.mode + 5 else False
     
     # 印出棋盤
     def print_board(self):
@@ -184,7 +191,7 @@ class MCTS_Node(object):
                 player = cur.simu_player      
                       
             simu_player = 'CHAOS' if player == 'ORDER' else 'ORDER'   
-            child_node = MCTS_Node(board=moved_board, color_base=deepcopy(cur.color_base), main_player=self.main_player, simu_player=simu_player, parent=cur, parent_action=action)    
+            child_node = MCTS_Middle(board=moved_board, color_base=deepcopy(cur.color_base), mode=self.mode, score=self.original_score, main_player=self.main_player, simu_player=simu_player, parent=cur, parent_action=action)    
             cur.children.append(child_node)            
             cur = child_node
         return cur
@@ -234,31 +241,35 @@ class MCTS_Node(object):
                             score += k
         return score
     
-    def early_end(self):
-        game = RP(player=self.main_player, board=deepcopy(self.board))
-        
-        for row in range(7):
-            for col in range(7):
-                if game.board[row][col] == 0:
-                    game.board[row][col] = game.color_base.pop()
-        return game.board
-    
-    def game_result(self):    
-        board = self.early_end() 
-        score = self.get_score(board)
-        if score == 80:
-            return 0, 0
+    def game_result(self):   
+        score = self.get_score()         
         if self.main_player == 'CHAOS':
-            if score > 80:
-                return -1, score // 7
+            standard = -int(3 + 0.07 * self.mode)
+            gap = self.original_score - score
+            # print(score, self.original_score, standard, gap)
+            
+            if gap == standard:
+                return 0, 0
+            elif gap < standard:
+                # print('lose', abs(gap-standard))
+                return -1, abs(gap-standard)
             else:
-                return 1, score // 7
+                # print('win', abs(gap-standard))
+                return 1, abs(gap-standard)
         else:
-            if score < 80:
-                return -1, score // 7
+            standard = int(6 + 0.07 * self.mode)
+            gap = score - self.original_score
+            # print(score, self.original_score, standard, gap)
+            
+            if gap == standard:
+                return 0, 0
+            if gap < standard:
+                # print('lose', gap-standard)
+                return -1, abs(gap-standard)
             else:
-                return 1, score // 7
-        
+                # print('win', gap-standard)
+                return 1, abs(gap-standard)
+                        
     def backpropagate(self, result=None, point=None):
         self.visited_time += 1
         if point == None:
@@ -270,10 +281,10 @@ class MCTS_Node(object):
     def is_fully_expanded(self):
         return len(self.unpassed_actions) == 0
     
-    def select(self, c=10):
+    def select(self, c=15):
         ucb_array = []
         for child in self.children:
-            ucb_array.append((child.q() / child.n()) + c * np.sqrt((2 * np.log(self.n()) / child.n())))
+            ucb_array.append((child.q() / child.n()) + c * np.sqrt((2 * np.log(self.n()) / child.n()))) 
         return self.children[np.argmax(ucb_array)]
     
     def tree_rule(self):
@@ -289,17 +300,16 @@ class MCTS_Node(object):
                 current_node = current_node.select()
         return current_node
     
-    def best_action(self, simulate_time = 1000): 
+    def best_action(self, simulate_time = 10000): 
         node = None       
         for i in range(simulate_time):
             # expansion
-            # print(i)
-            random.shuffle(self.color_base)
             node = self.tree_rule()
             # simulation
             end = node.rollout()
             #backpropagation
             end.backpropagate()
+
         dfs = MCTSTreeDFS(self)
         print('start')
         with open('data.json', 'w') as f:
@@ -348,12 +358,13 @@ class MCTSTreeDFS:
             #         self.traverse(child, file)
             self.depth -= 1
 
-def main():
-    start = time()
-    player = 'ORDER'
+def main():    
+    player = 'CHAOS'
     game = RP(player=player)
-    root = MCTS_Node(board=game.board, main_player=player, color_base=game.color_base, color=2)
-    selected_node = root.best_action(simulate_time=4500)
+    start = time()
+    chess_num = np.count_nonzero(game.board)
+    root = MCTS_Middle(board=game.board, main_player=player, color_base=game.color_base, color=6, mode = chess_num)
+    selected_node = root.best_action(simulate_time = 3000)
     selected_node.print_board()
     end = time()
     print(end-start)
