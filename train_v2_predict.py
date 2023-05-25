@@ -191,11 +191,12 @@ y_train = np.array(y_train)
 x_test = np.array(x_test)
 y_test = np.array(y_test)
 # 資料正規化
+'''
 mean = x_train.mean(axis=0)
 std = x_train.std(axis = 0) # 標準差
 x_train = (x_train-mean)/std
 x_test = (x_test-mean)/std
-
+'''
 print(type(x_train))
 print(type(y_train))
 print(type(x_test))
@@ -215,13 +216,6 @@ import tensorflow as tf
 # 建神經網路
 model = tf.keras.Sequential(
         [tf.keras.layers.Dense(147, activation='relu',input_shape=(147, )),  #參數:數量,活化函數,每筆data數
-         tf.keras.layers.Dense(147, activation='relu'),
-         tf.keras.layers.Dense(147, activation='relu'),
-         tf.keras.layers.Dense(147, activation='relu'),
-         tf.keras.layers.Dense(147, activation='relu'),
-         tf.keras.layers.Dense(147, activation='relu'),
-         tf.keras.layers.Dense(147, activation='relu'),
-         tf.keras.layers.Dense(147, activation='relu'),
          tf.keras.layers.Dense(147, activation='relu'),
          tf.keras.layers.Dense(147, activation='relu'),
         
@@ -252,6 +246,7 @@ print('loss:{:.3f}\nmae: {:.3f}'.format(test_loss, test_mae))
 """# 測試結果"""
 
 #測試結果
+print(x_test[0])
 print('前十筆測試標籤', y_test[0:10])
 test_predictions = model.predict(x_test[0:10], verbose = 0).flatten()
 print('前十筆預測結果', np.round(test_predictions))
